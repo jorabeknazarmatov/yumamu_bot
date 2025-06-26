@@ -13,10 +13,14 @@ class UploadLesson(StatesGroup):
     waiting_for_video = State()
     waiting_for_description = State()
 
+class Broadcast(StatesGroup):
+    waiting_for_message = State()
+
 keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📤 Darsni yuklash", callback_data="upload_lesson")],
         [InlineKeyboardButton(text="👥 O'quvchilar statistikasi", callback_data="student_stats")],
-        [InlineKeyboardButton(text="📚 Darslar ro'yxati", callback_data="lesson_list")]
+        [InlineKeyboardButton(text="📚 Darslar ro'yxati", callback_data="lesson_list")],
+        [InlineKeyboardButton(text="📢 Xabar yuborish", callback_data="broadcast_message")]
     ])
 
 @router.message(Command("start"))
@@ -132,3 +136,38 @@ async def approve_payment(callback: CallbackQuery):
     ]))
 
     await callback.answer("Foydalanuvchiga ruxsat berildi.")
+
+@router.callback_query(F.data == "broadcast_message")
+async def ask_broadcast_message(callback: CallbackQuery, state: FSMContext):
+    if str(callback.from_user.id) != os.getenv("ADMIN_ID"):
+        return
+    await callback.message.answer("📢 Iltimos, yubormoqchi bo‘lgan xabar/matn/faylni yuboring.")
+    await state.set_state(Broadcast.waiting_for_message)
+
+
+@router.message(Broadcast.waiting_for_message)
+async def handle_broadcast_content(message: Message, state: FSMContext):
+    from db import get_all_paid_users
+    from aiogram.exceptions import TelegramBadRequest
+
+    users = get_all_paid_users()
+    sent = 0
+
+    for user_id in users:
+        try:
+            if message.text:
+                await message.bot.send_message(user_id, message.text)
+            elif message.photo:
+                await message.bot.send_photo(user_id, message.photo[-1].file_id, caption=message.caption)
+            elif message.video:
+                await message.bot.send_video(user_id, message.video.file_id, caption=message.caption)
+            elif message.voice:
+                await message.bot.send_voice(user_id, message.voice.file_id, caption=message.caption)
+            elif message.document:
+                await message.bot.send_document(user_id, message.document.file_id, caption=message.caption)
+            sent += 1
+        except TelegramBadRequest:
+            continue  # foydalanuvchi bloklagan bo'lishi mumkin
+
+    await message.answer(f"✅ {sent} ta foydalanuvchiga xabar yuborildi.", reply_markup=keyboard)
+    await state.clear()

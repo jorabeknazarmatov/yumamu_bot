@@ -134,3 +134,7 @@ def is_user_paid(telegram_id: int) -> bool:
     cursor.execute("SELECT pay FROM users WHERE telegram_id = ?", (telegram_id,))
     result = cursor.fetchone()
     return result[0] == 1 if result else False
+
+def get_all_paid_users():
+    cursor.execute("SELECT telegram_id FROM users WHERE pay = 1")
+    return [row[0] for row in cursor.fetchall()]
