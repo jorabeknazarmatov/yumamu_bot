@@ -42,6 +42,17 @@ try:
 except sqlite3.OperationalError:
     pass
 
+try:
+    cursor.execute("ALTER TABLE users ADD COLUMN phone TEXT")
+except sqlite3.OperationalError:
+    pass
+
+try:
+    cursor.execute("ALTER TABLE users ADD COLUMN pay BOOLEAN DEFAULT 0")
+except sqlite3.OperationalError:
+    pass
+
+
 conn.commit()
 
 def add_lesson(video_file_id: str, description: str):
@@ -60,16 +71,17 @@ def get_user(telegram_id: int):
     cursor.execute("SELECT id, current_lesson FROM users WHERE telegram_id = ?", (telegram_id,))
     return cursor.fetchone()
 
-def add_or_get_user(telegram_id: int, first_name: str = '', last_name: str = ''):
+def add_or_get_user(telegram_id: int, first_name: str = '', last_name: str = '', phone: str = '', pay: bool = False):
     user = get_user(telegram_id)
     if not user:
         cursor.execute(
-            "INSERT INTO users (telegram_id, first_name, last_name) VALUES (?, ?, ?)",
-            (telegram_id, first_name, last_name)
+            "INSERT INTO users (telegram_id, first_name, last_name, phone, pay) VALUES (?, ?, ?, ?, ?)",
+            (telegram_id, first_name, last_name, phone, pay)
         )
         conn.commit()
         return get_user(telegram_id)
     return user
+
 
 
 def update_user_lesson(telegram_id: int, lesson_id: int):
@@ -113,3 +125,12 @@ def delete_lesson_and_reorder(lesson_id: int):
 def get_all_lessons():
     cursor.execute("SELECT id, video_file_id, description FROM lessons ORDER BY id")
     return cursor.fetchall()
+
+def update_user_pay(telegram_id: int, pay: bool):
+    cursor.execute("UPDATE users SET pay = ? WHERE telegram_id = ?", (pay, telegram_id))
+    conn.commit()
+
+def is_user_paid(telegram_id: int) -> bool:
+    cursor.execute("SELECT pay FROM users WHERE telegram_id = ?", (telegram_id,))
+    result = cursor.fetchone()
+    return result[0] == 1 if result else False

@@ -3,7 +3,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKe
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.filters import Command
-from db import add_lesson, get_user_lesson_stats, get_all_lessons, delete_lesson_and_reorder
+from db import add_lesson, get_user_lesson_stats, get_all_lessons, delete_lesson_and_reorder, update_user_pay
 import os, dotenv
 dotenv.load_dotenv()
 
@@ -51,7 +51,7 @@ async def lesson_description_received(message: Message, state: FSMContext):
     description = message.text
     add_lesson(video_id, description)
     await state.clear()
-    await message.answer("✅ Dars muvaffaqiyatli yuklandi!", reply_markup=keyboard)
+    await message.answer(" Darsni muvaffaqiyatli yuklaganingiz bilan tabriklayman!", reply_markup=keyboard)
 
 
 @router.callback_query(F.data == "student_stats")
@@ -121,3 +121,14 @@ async def confirm_and_delete(callback: CallbackQuery):
     delete_lesson_and_reorder(lesson_id)
     await callback.message.answer(f"❌ {lesson_id}-dars o‘chirildi. Darslar tartibi yangilandi.")
 
+@router.callback_query(F.data.startswith("approve_payment:"))
+async def approve_payment(callback: CallbackQuery):
+    user_id = int(callback.data.split(":")[1])
+    update_user_pay(user_id, True)
+
+    # foydalanuvchiga xabar
+    await callback.bot.send_message(user_id, "✅ To‘lovingiz tasdiqlandi! Endi darsni boshlashingiz mumkin.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="▶️ Darsni boshlash", callback_data="start_lesson")]
+    ]))
+
+    await callback.answer("Foydalanuvchiga ruxsat berildi.")
